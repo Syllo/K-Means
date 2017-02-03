@@ -1,6 +1,2 @@
-K-Mean
-======
-
-K-mean implementation.
-
-
+K-Means Clusteting
+==================
