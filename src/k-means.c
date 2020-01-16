@@ -33,8 +33,10 @@ static void initialize_centroids_float(size_t points, size_t dimension,
                                        uint8_t k, float data[points][dimension],
                                        float centroids[k][dimension]) {
   for (size_t i = 0; i < k; ++i) {
-    double random_position =
-        floor(random() / (double)RAND_MAX * (double)points);
+    long int randval = random();
+    double random_position = (double)randval;
+    random_position /= (double)RAND_MAX;
+    random_position *= (double)points;
     size_t random_position_unsigned = (size_t)random_position;
     for (size_t j = 0; j < dimension; ++j) {
       centroids[i][j] = data[random_position_unsigned][j];
@@ -47,7 +49,8 @@ static void initialize_centroids_double(size_t points, size_t dimension,
                                         double data[points][dimension],
                                         double centroids[k][dimension]) {
   for (size_t i = 0; i < k; ++i) {
-    double random_position = (double)random();
+    long int randval = random();
+    double random_position = (double)randval;
     random_position /= (double)RAND_MAX;
     random_position *= (double)points;
     size_t random_position_unsigned = (size_t)random_position;
@@ -78,7 +81,7 @@ size_t k_means_d(size_t points, size_t dimension, uint8_t k,
     // For every data
     for (size_t pos = 0; pos < points; ++pos) {
 
-      size_t centroid_chosen = 0;
+      uint8_t centroid_chosen = 0;
       double closest_centroid = HUGE_VAL;
       // Find the closest centroid
       for (uint8_t centro = 0; centro < k; ++centro) {
@@ -145,7 +148,7 @@ size_t k_means_f(size_t points, size_t dimension, uint8_t k,
     // For every data
     for (size_t pos = 0; pos < points; ++pos) {
 
-      size_t centroid_chosen = 0;
+      uint8_t centroid_chosen = 0;
       float closest_centroid = HUGE_VALF;
       // Find the closest centroid
       for (uint8_t centro = 0; centro < k; ++centro) {
