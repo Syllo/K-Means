@@ -62,9 +62,12 @@ static struct option opt_options[] = {
     {"random-data", required_argument, 0, 'r'},
     {"random-seed", required_argument, 0, 's'},
     {"help", no_argument, 0, 'h'},
+    {"compare", required_argument, 0, 'C'},
+    {"settle_skip", required_argument, 0, 'S'},
+    {"settle_invalid_neighbour", required_argument, 0, 'I'},
     {0, 0, 0, 0}};
 
-static const char options[] = ":i:o:c:r:d:m:s:h";
+static const char options[] = ":i:o:c:r:d:m:s:hS:I:C:";
 
 static const char help_string[] =
     "Options:"
@@ -79,10 +82,14 @@ static const char help_string[] =
     "\n                       initalize the algorithm and the random data"
     "\n  -h --help             : Print this help";
 
+uint32_t settle_at = UINT32_MAX;
+unsigned invalid_neighbours_up_to = 0;
+
 int main(int argc, char **argv) {
   unsigned random_seed = 42;
   char *png_input_file = NULL;
   char *png_output_file = NULL;
+  char *file_to_compare = NULL;
   bool use_double = false;
   size_t num_dims = 1;
   uint8_t num_centroids = 4;
@@ -146,6 +153,31 @@ int main(int argc, char **argv) {
                 optchar, optarg);
       }
       break;
+    case 'C':
+      file_to_compare = optarg;
+      break;
+    case 'I':
+      sscanf_return = sscanf(optarg, "%u", &invalid_neighbours_up_to);
+      if (sscanf_return == EOF || sscanf_return == 0) {
+        fprintf(stderr,
+                "Please enter a positive integer number for the "
+                "number of neighbours to invalidate "
+                "instead of \"-%c %s\"\n",
+                optchar, optarg);
+        invalid_neighbours_up_to = 0;
+      }
+      break;
+    case 'S':
+      sscanf_return = sscanf(optarg, "%" SCNu32, &settle_at);
+      if (sscanf_return == EOF || sscanf_return == 0) {
+        fprintf(stderr,
+                "Please enter a positive integer number for the "
+                "settle skip value "
+                "instead of \"-%c %s\"\n",
+                optchar, optarg);
+        settle_at = UINT32_MAX;
+      }
+      break;
     case 'h':
       printf("Usage: %s <options>\n%s\n", argv[0], help_string);
       return EXIT_SUCCESS;
@@ -171,6 +203,56 @@ int main(int argc, char **argv) {
   float(*data_f)[num_dims] = NULL;
   double(*data_d)[num_dims] = NULL;
 
+  if (file_to_compare) {
+    num_dims = 4;
+
+    if (png_input_file == NULL) {
+      fprintf(stderr, "Two files are needed for comparison (use -i and -C)\n");
+      return EXIT_FAILURE;
+    }
+    uint32_t height = 0, width = 0, height2 = 0, width2 = 0;
+    uint16_t *image = NULL;
+    uint16_t *image2 = NULL;
+    bool read_success = read_png(png_input_file, &image, &height, &width);
+    bool read_success2 = read_png(file_to_compare, &image2, &height2, &width2);
+    if (!read_success || !read_success2) {
+      fprintf(stderr, "libpng was unable to read the image files\n");
+      exit(EXIT_FAILURE);
+    }
+    if (width != width2) {
+      fprintf(stderr, "The images to compare must have the same width\n");
+      exit(EXIT_FAILURE);
+    }
+    if (height != height2) {
+      fprintf(stderr, "The images to compare must have the same height\n");
+      exit(EXIT_FAILURE);
+    }
+    num_points = width;
+    num_points *= height;
+    uint16_t(*image_tab)[width][4] = (uint16_t(*)[width][4])image;
+    uint16_t(*image_tab2)[width][4] = (uint16_t(*)[width][4])image2;
+    size_t differences = 0;
+    for (size_t i = 0; i < height; ++i) {
+      for (size_t j = 0; j < width; ++j) {
+        bool equal = true;
+        for (unsigned k = 0; k < 4; ++k) {
+          if (image_tab[i][j][k] != image_tab2[i][j][k])
+            equal = false;
+        }
+        if (!equal) {
+          differences++;
+        }
+      }
+    }
+    fprintf(stdout, "Num differences: %zu\n", differences);
+    fprintf(stdout, "Num Points: %u\n", width * height);
+    fprintf(stdout, "Error: %e%%\n",
+            differences / (double)(width * height) * 100.);
+    free(image);
+    free(image2);
+    return EXIT_SUCCESS;
+  }
+
   uint32_t height = 0, width = 0;
   if (png_input_file != NULL) { // Read data from png file
     uint16_t *image = NULL;
@@ -191,7 +273,6 @@ int main(int argc, char **argv) {
           data_d_tab[i][j][3] = image_tab[i][j][3];
         }
       }
-
     } else {
       data_f = malloc(sizeof(float[num_points][num_dims]));
       float(*data_f_tab)[width][4] = (float(*)[width][4])data_f;
@@ -221,8 +302,7 @@ int main(int argc, char **argv) {
     }
   }
 
-  uint8_t *point_centroid_map =
-      malloc(num_points * sizeof(*point_centroid_map));
+  uint8_t *point_centroid_map = calloc(num_points, sizeof(*point_centroid_map));
   size_t steps_to_convergence = 0;
 
   time_measure startTime, endTime;

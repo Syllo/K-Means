@@ -23,6 +23,7 @@
 
 #include <math.h>
 #include <stdbool.h>
+#include <stdint.h>
 #include <string.h>
 
 #include <stdio.h>
@@ -65,7 +66,7 @@ size_t k_means_d(size_t points, size_t dimension, uint8_t k,
                  uint8_t point_centroid_map[points]) {
 
   double(*centroids_temp)[dimension] = malloc(sizeof(double[k][dimension]));
-  double (*centroids)[dimension] = malloc(sizeof(double[k][dimension]));
+  double(*centroids)[dimension] = malloc(sizeof(double[k][dimension]));
   size_t *centroids_point_count = malloc(k * sizeof(*centroids_point_count));
 
   initialize_centroids_double(points, dimension, k, data, centroids);
@@ -127,19 +128,26 @@ size_t k_means_d(size_t points, size_t dimension, uint8_t k,
   return convergence_iterations;
 }
 
+extern uint32_t settle_at;
+extern unsigned invalid_neighbours_up_to;
+
 size_t k_means_f(size_t points, size_t dimension, uint8_t k,
                  float data[restrict points][dimension],
                  uint8_t point_centroid_map[points]) {
 
   float(*centroids_temp)[dimension] = malloc(sizeof(float[k][dimension]));
   size_t *centroids_point_count = malloc(k * sizeof(*centroids_point_count));
-  float (*centroids)[dimension] = malloc(sizeof(float[k][dimension]));
+  float(*centroids)[dimension] = malloc(sizeof(float[k][dimension]));
 
   initialize_centroids_float(points, dimension, k, data, centroids);
 
   bool has_converged;
 
   size_t convergence_iterations = 0;
+
+  uint32_t *niter_bound_centroid =
+      calloc(points, sizeof(*niter_bound_centroid));
+
   do {
 
     memset(centroids_point_count, 0, k * sizeof(size_t));
@@ -147,6 +155,9 @@ size_t k_means_f(size_t points, size_t dimension, uint8_t k,
     has_converged = true; // Assume convergence until proven otherwise
     // For every data
     for (size_t pos = 0; pos < points; ++pos) {
+
+      if (niter_bound_centroid[pos] > settle_at)
+        goto skip;
 
       uint8_t centroid_chosen = 0;
       float closest_centroid = HUGE_VALF;
@@ -163,9 +174,19 @@ size_t k_means_f(size_t points, size_t dimension, uint8_t k,
         }
       }
 
-      if (point_centroid_map[pos] != centroid_chosen)
+      if (point_centroid_map[pos] != centroid_chosen) {
         has_converged = false;
+        size_t lb = pos < invalid_neighbours_up_to ? 0 : pos - invalid_neighbours_up_to;
+        size_t ub = pos + invalid_neighbours_up_to > points - 1 ? points - 1: pos + invalid_neighbours_up_to;
+        for (size_t it = lb; it <= ub; ++it) {
+          niter_bound_centroid[it] = 0;
+        }
+      }
+
       point_centroid_map[pos] = centroid_chosen;
+    skip:
+      niter_bound_centroid[pos]++;
+      centroid_chosen = point_centroid_map[pos];
       centroids_point_count[centroid_chosen] += 1;
 
       if (centroids_point_count[centroid_chosen] == 1)
@@ -190,6 +211,7 @@ size_t k_means_f(size_t points, size_t dimension, uint8_t k,
   free(centroids_temp);
   free(centroids_point_count);
   free(centroids);
+  free(niter_bound_centroid);
 
   return convergence_iterations;
 }
