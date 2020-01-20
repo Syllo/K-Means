@@ -1,8 +1,8 @@
-add_executable(kmeans k-means.c main.c k-means_png.c)
-target_include_directories(kmeans PRIVATE ${PROJECT_SOURCE_DIR}/include)
-set_property(TARGET kmeans
+add_executable(kmeansResilienceTest k-means.c main.c k-means_png.c)
+target_include_directories(kmeansResilienceTest PRIVATE ${PROJECT_SOURCE_DIR}/include)
+set_property(TARGET kmeansResilienceTest
   PROPERTY C_STANDARD 11)
-target_link_libraries(kmeans PRIVATE m)
+target_link_libraries(kmeansResilienceTest PRIVATE m)
 
 #find_package(PNG) # Embed the version for better portability
 if (NOT PNG_FOUND)
@@ -29,14 +29,14 @@ if (NOT PNG_FOUND)
   if (NOT TARGET png_static)
     message(FATAL_ERROR "K-Means require libPNG but the build failed")
   else()
-    target_link_libraries(kmeans PRIVATE png_static)
+    target_link_libraries(kmeansResilienceTest PRIVATE png_static)
   endif()
 else()
   add_library(png INTERFACE IMPORTED)
   set_property(TARGET png PROPERTY INTERFACE_INCLUDE_DIRECTORIES ${PNG_INCLUDE_DIRS})
   set_property(TARGET png PROPERTY INTERFACE_COMPILE_DEFINITIONS ${PNG_DEFINITIONS})
   set_property(TARGET png PROPERTY INTERFACE_LINK_LIBRARIES ${PNG_LIBRARIES})
-  target_link_libraries(kmeans PRIVATE png)
+  target_link_libraries(kmeansResilienceTest PRIVATE png)
 endif()
 
 # Compile Options
@@ -44,28 +44,28 @@ include(compile-flags-helpers)
 include(${PROJECT_SOURCE_DIR}/optimization_flags.cmake)
 
 if (DEFINED ADDITIONAL_BENCHMARK_COMPILE_OPTIONS)
-  add_compiler_option_to_target_type(kmeans Benchmark PRIVATE ${ADDITIONAL_BENCHMARK_COMPILE_OPTIONS})
+  add_compiler_option_to_target_type(kmeansResilienceTest Benchmark PRIVATE ${ADDITIONAL_BENCHMARK_COMPILE_OPTIONS})
 endif()
 
 foreach(compile_type IN ITEMS Release RelWithDebInfo)
-  add_compiler_option_to_target_type(kmeans ${compile_type} PRIVATE ${ADDITIONAL_RELEASE_COMPILE_OPTIONS})
-  add_linker_option_to_target_type(kmeans ${compile_type} PRIVATE ${ADDITIONAL_RELEASE_LINK_OPTIONS})
+  add_compiler_option_to_target_type(kmeansResilienceTest ${compile_type} PRIVATE ${ADDITIONAL_RELEASE_COMPILE_OPTIONS})
+  add_linker_option_to_target_type(kmeansResilienceTest ${compile_type} PRIVATE ${ADDITIONAL_RELEASE_LINK_OPTIONS})
 endforeach()
 
-add_compiler_option_to_target_type(kmeans Debug PRIVATE ${ADDITIONAL_DEBUG_COMPILE_OPTIONS})
+add_compiler_option_to_target_type(kmeansResilienceTest Debug PRIVATE ${ADDITIONAL_DEBUG_COMPILE_OPTIONS})
 
 # Linker Options
 
 if (DEFINED ADDITIONAL_BENCHMARK_LINK_OPTIONS)
-  add_linker_option_to_target_type(kmeans Benchmark PRIVATE ${ADDITIONAL_BENCHMARK_LINK_OPTIONS})
+  add_linker_option_to_target_type(kmeansResilienceTest Benchmark PRIVATE ${ADDITIONAL_BENCHMARK_LINK_OPTIONS})
 endif()
 
-add_sanitizers_to_target(kmeans Debug PRIVATE address undefined)
+add_sanitizers_to_target(kmeansResilienceTest Debug PRIVATE address undefined)
 
 include(CheckIPOSupported)
 check_ipo_supported(RESULT result)
 if((result) AND USE_IPO)
-  set_property(TARGET kmeans PROPERTY INTERPROCEDURAL_OPTIMIZATION TRUE)
+  set_property(TARGET kmeansResilienceTest PROPERTY INTERPROCEDURAL_OPTIMIZATION TRUE)
 endif()
 
-install(TARGETS kmeans RUNTIME DESTINATION bin)
+install(TARGETS kmeansResilienceTest RUNTIME DESTINATION bin)
